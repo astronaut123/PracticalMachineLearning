@@ -1,0 +1,182 @@
+<h1 id="practical-machine-learning-project">Practical machine learning - Project</h1>
+
+<p>The main goal of this project was to build predictive model for given dataset:</p>
+
+<p><a href="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv">https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv</a></p>
+
+<p>Second part of project was to predict 20 test </p>
+
+
+
+<h2 id="loading-libraries">Loading libraries</h2>
+
+<p>First thing that is required to do is to load all necessary libraries and set working directory</p>
+
+
+
+<pre class="prettyprint"><code class="language-r hljs "><span class="hljs-keyword">library</span>(caret)
+setwd(getScriptPath())</code></pre>
+
+
+
+<h2 id="loading-datasets">Loading datasets</h2>
+
+<p>After library initialization, it is required to load datasets <br>
+script will automatically download required datasets</p>
+
+
+
+<pre class="prettyprint"><code class="language-r hljs ">urls &lt;- c(<span class="hljs-string">"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"</span>,<span class="hljs-string">"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"</span>)</code></pre>
+
+
+
+<pre class="prettyprint"><code class="language-r hljs ">path &lt;- getwd()
+download.file(urls[<span class="hljs-number">1</span>], file.path(path, <span class="hljs-string">"pml-training.csv"</span>),method=<span class="hljs-string">"auto"</span>)
+download.file(urls[<span class="hljs-number">2</span>], file.path(path, <span class="hljs-string">"pml-testing.csv"</span>),method=<span class="hljs-string">"auto"</span>)</code></pre>
+
+<p>after download, it is required to load files so we can work with it</p>
+
+
+
+<pre class="prettyprint"><code class="language-r hljs ">trainset&lt;-read.csv(<span class="hljs-string">"pml-training.csv"</span>)
+testset&lt;-read.csv(<span class="hljs-string">"pml-testing.csv"</span>)
+</code></pre>
+
+
+
+<h2 id="splitting-data-and-cleaning-data">Splitting data and cleaning data</h2>
+
+<p>Next is required to divide training set into training and cross validation</p>
+
+<p>Data will be divided in 60:40 ratio (60% training, 40% for validation). It is also important to remove some columns which are not important for training or which have NA values.</p>
+
+
+
+<pre class="prettyprint"><code class="language-r hljs ">
+training&lt;-createDataPartition(y=trainset$classe,p=<span class="hljs-number">0.60</span>,list=<span class="hljs-literal">FALSE</span>)
+
+crossvalidation&lt;-trainset[-training,]
+training&lt;-trainset[training,]
+
+nums &lt;- sapply(training, is.numeric)
+nums[<span class="hljs-string">"classe"</span>]&lt;-<span class="hljs-literal">TRUE</span>
+nums[<span class="hljs-string">"X"</span>]&lt;-<span class="hljs-literal">FALSE</span>
+nums[<span class="hljs-string">"raw_timestamp_part_1"</span>]&lt;-<span class="hljs-literal">FALSE</span>
+nums[<span class="hljs-string">"raw_timestamp_part_2"</span>]&lt;-<span class="hljs-literal">FALSE</span>
+nums[<span class="hljs-string">"cvtd_timestamp"</span>]&lt;-<span class="hljs-literal">FALSE</span>
+nums[<span class="hljs-string">"num_window"</span>]&lt;-<span class="hljs-literal">FALSE</span>
+training&lt;-training[,nums]
+testset&lt;-testset[,nums]
+crossvalidation&lt;-crossvalidation[,nums]
+testset&lt;-testset[colSums(is.na(training))==<span class="hljs-number">0</span>]
+crossvalidation&lt;-crossvalidation[colSums(is.na(training))==<span class="hljs-number">0</span>]
+training&lt;-training[colSums(is.na(training))==<span class="hljs-number">0</span>]</code></pre>
+
+<h2 id="training">Training</h2>
+
+<p>Next step is training a model. I will use lda and random forest algorithms and compare them</p>
+
+
+
+<pre class="prettyprint"><code class="language-r hljs ">ldaFit &lt;- train(classe ~ .,data=training,method=<span class="hljs-string">"lda"</span>,verbose=<span class="hljs-literal">FALSE</span>)
+rfModel &lt;- randomForest(classe ~ ., data = training)</code></pre>
+
+
+
+<pre class="prettyprint"><code class="language-r hljs ">
+pvalidation &lt;- predict(ldaFit, crossvalidation)
+print(confusionMatrix(pvalidation, crossvalidation$classe))
+
+pvalidation &lt;- predict(rfModel, crossvalidation)
+print(confusionMatrix(pvalidation, crossvalidation$classe))
+
+</code></pre>
+
+<p>Results using lda:</p>
+
+<pre><code>Confusion Matrix and Statistics
+
+          Reference
+Prediction    A    B    C    D    E
+         A 1844  235  144   79   58
+         B   54  962  121   46  238
+         C  176  201  892  156  125
+         D  146   62  174  939  131
+         E   12   58   37   66  890
+
+Overall Statistics
+
+               Accuracy : 0.7044          
+                 95% CI : (0.6942, 0.7145)
+    No Information Rate : 0.2845          
+    P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+
+                  Kappa : 0.6257          
+ Mcnemar's Test P-Value : &lt; 2.2e-16       
+
+Statistics by Class:
+
+                     Class: A Class: B Class: C Class: D Class: E
+Sensitivity            0.8262   0.6337   0.6520   0.7302   0.6172
+Specificity            0.9081   0.9275   0.8984   0.9218   0.9730
+Pos Pred Value         0.7814   0.6770   0.5755   0.6467   0.8373
+Neg Pred Value         0.9293   0.9135   0.9244   0.9457   0.9186
+Prevalence             0.2845   0.1935   0.1744   0.1639   0.1838
+Detection Rate         0.2350   0.1226   0.1137   0.1197   0.1134
+Detection Prevalence   0.3008   0.1811   0.1976   0.1851   0.1355
+Balanced Accuracy      0.8671   0.7806   0.7752   0.8260   0.7951
+</code></pre>
+
+<p>Results using random forest algorithm:</p>
+
+<pre><code>Confusion Matrix and Statistics
+
+          Reference
+Prediction    A    B    C    D    E
+         A 2230    3    0    0    0
+         B    2 1515   16    0    0
+         C    0    0 1351   23    0
+         D    0    0    1 1260    6
+         E    0    0    0    3 1436
+
+Overall Statistics
+
+               Accuracy : 0.9931         
+                 95% CI : (0.991, 0.9948)
+    No Information Rate : 0.2845         
+    P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+
+                  Kappa : 0.9913         
+ Mcnemar's Test P-Value : NA             
+
+Statistics by Class:
+
+                     Class: A Class: B Class: C Class: D Class: E
+Sensitivity            0.9991   0.9980   0.9876   0.9798   0.9958
+Specificity            0.9995   0.9972   0.9964   0.9989   0.9995
+Pos Pred Value         0.9987   0.9883   0.9833   0.9945   0.9979
+Neg Pred Value         0.9996   0.9995   0.9974   0.9960   0.9991
+Prevalence             0.2845   0.1935   0.1744   0.1639   0.1838
+Detection Rate         0.2842   0.1931   0.1722   0.1606   0.1830
+Detection Prevalence   0.2846   0.1954   0.1751   0.1615   0.1834
+Balanced Accuracy      0.9993   0.9976   0.9920   0.9894   0.9977
+</code></pre>
+
+<p>As we can see, random forest algorithm has better accuracy so it will be used for predicting classe variable for test set</p>
+
+
+
+<pre class="prettyprint"><code class="language-r hljs ">
+ptraining &lt;- predict(rfModel, testset)
+
+pml_write_files = <span class="hljs-keyword">function</span>(x){
+  n = length(x)
+  <span class="hljs-keyword">for</span>(i <span class="hljs-keyword">in</span> <span class="hljs-number">1</span>:n){
+    filename = paste0(<span class="hljs-string">"problem_id_"</span>,i,<span class="hljs-string">".txt"</span>)
+    write.table(x[i],file=filename,quote=<span class="hljs-literal">FALSE</span>,row.names=<span class="hljs-literal">FALSE</span>,col.names=<span class="hljs-literal">FALSE</span>)
+  }
+}
+
+
+pml_write_files(ptraining)
+</code></pre>
